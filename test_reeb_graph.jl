@@ -7,27 +7,32 @@ include("mesh_utils.jl")
 include("crit_pts.jl")
 include("mesh_io.jl")
 
+X, T = MeshUtils.readoff("models/moomoo.off")
+rot_mat = RotZ(-0.3) * RotX(pi/2)
 
-X, T = MeshUtils.readoff("moomoo.off")
-X = X * RotX(pi/2)
+# X, T = MeshUtils.readoff("models/torusish.off")
+# rot_mat = RotX(-0.3)
 
-model = load("moomoo.off")
-vertices = decompose(Point3f0, model)
-faces = decompose(TriangleFace{Int}, model)
+X = X * rot_mat
+
+# model = load("models/moomoo.off")
+# vertices = decompose(Point3f0, model)
+# faces = decompose(TriangleFace{Int}, model)
 # vertices = X
 # faces = T
-coordinates = [vertices[i][j] for i = 1:length(vertices), j = 1:3]
-coordinates = coordinates * RotX(pi/2)
-connectivity = [faces[i][j] for i = 1:length(faces), j = 1:3]
+# coordinates = [vertices[i][j] for i = 1:length(vertices), j = 1:3]
+# coordinates = coordinates * rot_mat
+# connectivity = [faces[i][j] for i = 1:length(faces), j = 1:3]
 
 function plot_moomoo()
-  mesh(
-      coordinates, connectivity,
+  display(mesh(
+      # coordinates, connectivity,
+      X, T,
       shading=true,
       transparency=true,
       figure=(resolution=(700, 1000),),
       color = (:red, 0.1)
-  )
+  ))
 end
 
 function plot_vertex_normals()
@@ -50,20 +55,20 @@ end
 
 
 function plot_crit_points()
-  # plot_moomoo()
-  bounds = Node([
-    Point3f0(0., 0., 0.),
-    Point3f0(15., 0., 0.),
-    Point3f0(-15., 0., 0.),
-    Point3f0(0., 0., 20.),
-    Point3f0(0., 0., -30.),
-    Point3f0(0., 20., 0.),
-    Point3f0(0., -15., 0.),
-  ])
-  lines(bounds, linewidth=0, transparency=true, color=(:black, 0.0),
-      shading=true,
-      figure=(resolution=(700, 1000),),
-  )
+  plot_moomoo()
+  # bounds = Node([
+  #   Point3f0(0., 0., 0.),
+  #   Point3f0(15., 0., 0.),
+  #   Point3f0(-15., 0., 0.),
+  #   Point3f0(0., 0., 20.),
+  #   Point3f0(0., 0., -30.),
+  #   Point3f0(0., 20., 0.),
+  #   Point3f0(0., -15., 0.),
+  # ])
+  # display(lines(bounds, linewidth=0, transparency=true, color=(:black, 0.0),
+  #     shading=true,
+  #     figure=(resolution=(700, 1000),),
+  # ))
   crits = crit_points(X, T)
   plot_spheres(crit_idxs(crit_mins(crits)), :yellow)
   plot_spheres(crit_idxs(crit_maxs(crits)), :green)
@@ -91,7 +96,7 @@ for e in edges(rg)
   src_vert_idx = crits[src_crits_idx][2][1]
   dst_vert_idx = crits[dst_crits_idx][2][1]
   line_seg = Node([Point3f0(X[src_vert_idx, :]), Point3f0(X[dst_vert_idx, :])])
-  lines!(line_seg, linewidth=400)
+  lines!(line_seg, linewidth=800)
 end
 println(rg)
 
