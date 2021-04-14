@@ -30,7 +30,17 @@ function crit_points(X, T)
       elseif np_val < p_val
         sides[j] = -1
       else
-        @assert false "multiple vertices with same value!"
+        # display(mesh(
+        #     X, T,
+        #     shading=true,
+        #     transparency=true,
+        #     figure=(resolution=(700, 1000),),
+        #     color = (:red, 0.1)
+        # ))
+        # mesh!(Sphere(Point3f0(p), 0.5f0), transparency=false)
+        # mesh!(Sphere(Point3f0(np), 0.5f0), transparency=false)
+        # @assert false "multiple vertices with same value!"
+        sides[j] = -1
       end
     end
     if sum(sides) == num_neighbs

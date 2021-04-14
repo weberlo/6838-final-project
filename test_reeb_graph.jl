@@ -7,36 +7,57 @@ include("mesh_utils.jl")
 include("crit_pts.jl")
 include("mesh_io.jl")
 
-X, T = MeshUtils.readoff("models/moomoo.off")
-rot_mat = RotZ(-0.3) * RotX(pi/2)
+# X, T = MeshUtils.readoff("models/sphere.off")
+# rot_mat = I
+
+# X, T = MeshUtils.readoff("models/moomoo.off")
+# rot_mat = RotZ(-0.5) * RotX(pi/2)
 
 # X, T = MeshUtils.readoff("models/torusish.off")
 # rot_mat = RotX(-0.3)
 
-X = X * rot_mat
 
-# model = load("models/moomoo.off")
-# vertices = decompose(Point3f0, model)
-# faces = decompose(TriangleFace{Int}, model)
+
+model = load("models/lozenge.off")
+X = decompose(Point3f0, model)
+T = decompose(TriangleFace{Int}, model)
+
+X = [X[i][j] for i = 1:length(X), j = 1:3]
+T = [T[i][j] for i = 1:length(T), j = 1:3]
+println(size(X))
+println(size(T))
+
+
 # vertices = X
 # faces = T
 # coordinates = [vertices[i][j] for i = 1:length(vertices), j = 1:3]
 # coordinates = coordinates * rot_mat
 # connectivity = [faces[i][j] for i = 1:length(faces), j = 1:3]
 
-function plot_moomoo()
-  display(mesh(
-      # coordinates, connectivity,
-      X, T,
+
+# X = X * rot_mat
+
+
+function plot_current_mesh()
+  # display(mesh(
+  #     X, T,
+  #     shading=true,
+  #     transparency=true,
+  #     figure=(resolution=(700, 1000),),
+  #     color = (:red, 0.1)
+  # ))
+  display(meshscatter(
+      X,
       shading=true,
       transparency=true,
       figure=(resolution=(700, 1000),),
-      color = (:red, 0.1)
+      color = (:black, 0.5),
+      markersize = 0.1
   ))
 end
 
 function plot_vertex_normals()
-  plot_moomoo()
+  plot_current_mesh()
   VN = vertex_normals(X, T)
   arrows!(
     Point3.(eachrow(X)),
@@ -55,7 +76,7 @@ end
 
 
 function plot_crit_points()
-  plot_moomoo()
+  plot_current_mesh()
   # bounds = Node([
   #   Point3f0(0., 0., 0.),
   #   Point3f0(15., 0., 0.),
