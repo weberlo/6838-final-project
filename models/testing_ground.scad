@@ -20,6 +20,7 @@
     }
 }*/
 
+/*
 difference() {
     
 rotate([0, 20, 0]) {
@@ -40,4 +41,16 @@ rotate([0, 20, 0]) {
 }
     translate([-15, -15, -1.4])
             cube([30, 30, 20]);
+}
+*/
+
+union() {   
+translate([-5, -5, 0])
+    cube([10, 10, 10]);
+translate([3, -5, 9])
+    cube([10, 10, 10]);
+translate([-13, -5, 6])
+    cube([10, 10, 10]);
+translate([-5, -5, 15])
+    cube([10, 10, 10]);
 }

@@ -22,6 +22,7 @@ function crit_points(X, T)
     num_neighbs = size(links[i], 1)
     sides = zeros(num_neighbs)
     p_val = dot(p, crit_H)
+    num_degen = 0
     for (j, neighb_X_idx) in enumerate(links[i])
       np = X[neighb_X_idx,:]
       np_val = dot(np, crit_H)
@@ -40,19 +41,20 @@ function crit_points(X, T)
         # mesh!(Sphere(Point3f0(p), 0.5f0), transparency=false)
         # mesh!(Sphere(Point3f0(np), 0.5f0), transparency=false)
         # @assert false "multiple vertices with same value!"
-        sides[j] = -1
+        sides[j] = 0
+        num_degen += 1
       end
     end
-    if sum(sides) == num_neighbs
+    if sum(sides) + num_degen == num_neighbs
       push!(res, (crit_min, (i, p_val)))
-    elseif sum(sides) == -num_neighbs
+    elseif sum(sides) - num_degen == -num_neighbs
       push!(res, (crit_max, (i, p_val)))
     else
       group_count = 0
       last = sides[1]
       for j = 2:(num_neighbs+1)
         curr = sides[mod1(j, num_neighbs)]
-        if sides[mod1(j, num_neighbs)] != last
+        if sides[mod1(j, num_neighbs)] != last && last != 0
           group_count += 1
         end
         last = curr
