@@ -66,14 +66,10 @@ function reeb_graph_of(e :: CSG.Expr)
   end
 
   function intersects_with(s1, s2)
-    return s1.x1 < s2.x2 && s1.x2 > s2.x1 && s1.y1 < s2.y2 && s1.y2 > s2.y1
+    return s1.x1 <= s2.x2 && s1.x2 >= s2.x1 && s1.y1 <= s2.y2 && s1.y2 >= s2.y1
   end
 
   function comp_union_find(shapes)
-    println("TODO stop shuffling intervals once your algorithm is robust to it")
-    # NOTE we need to handle arbitrary orderings of shapes for when we move to 3D.
-    shapes = shuffle(shapes)
-
     res = DisjointSets()
     for (i, _) in shapes
       push!(res, i)
@@ -213,10 +209,6 @@ function reeb_graph_of(e :: CSG.Expr)
 end
 
 
-test_expr = gen_4_torus()
-# show_csg(test_expr)
-
-
 using WGLMakie
 
 function show_csg(e :: CSG.Expr)
@@ -240,7 +232,11 @@ function show_csg(e :: CSG.Expr)
   end
 end
 
+
+test_expr = gen_kissing_torus()
 show_csg(test_expr)
 
-graph, edge_mult = reeb_graph_of(test_expr)
-show_graph(graph, edge_mult)
+@assert false "need to account for crit point multiplicities to correctly handle the kissing torus"
+
+# graph, edge_mult = reeb_graph_of(test_expr)
+# show_graph(graph, edge_mult)

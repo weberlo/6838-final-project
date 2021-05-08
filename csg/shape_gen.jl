@@ -87,3 +87,40 @@ function gen_4_torus()
     gen_square_at(size, Point3(0., 6., 0.)),
   ])
 end
+
+
+function gen_flat_line()
+  size = 4.
+  treeify([
+    gen_square_at(size, Point3(-6., 0., -6.)),
+    gen_square_at(size, Point3(-3., 0., -3.)),
+    gen_square_at(size, Point3(0., 0., 0.)),
+    gen_square_at(size, Point3(3., 0., 3.)),
+    gen_square_at(size, Point3(6., 0., 6.)),
+  ])
+end
+
+function gen_kissing_torus()
+  # where the components only barely touch
+  size = 4.
+  treeify([
+    gen_square_at(size, Point3(0., 0., 0.)),
+    gen_square_at(size, Point3(-3., 4., 0.)),
+    gen_square_at(size, Point3(3., 4., 0.)),
+    gen_square_at(size, Point3(0., 8., 0.)),
+  ])
+end
+
+# function gen_double_torus()
+#   size = 4.
+#   treeify([
+#     gen_square_at(size, Point3(0., 2., 0.)),
+#     gen_square_at(size, Point3(-3., 4., 0.)),
+#     gen_square_at(size, Point3(3., 5., 0.)),
+#     gen_square_at(size, Point3(0., 7., 0.)),
+#     gen_square_at(size, Point3(3., 11., 0.)),
+#     gen_square_at(size, Point3(-3., 11., 0.)),
+#     gen_square_at(size, Point3(-3., 11., 0.)),
+#     #TODO
+#   ])
+# end
