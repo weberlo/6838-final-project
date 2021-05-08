@@ -12,9 +12,23 @@ using Combinatorics
 # println(typeof(CSG.CUnion(c1, c2)))
 # reeb_graph_of()
 
-extents(s :: CSG.CSquare) = @match s begin
+extents(e :: CSG.Expr) = @match e begin
   CSG.CSquare(bot_left, top_right) =>
     (x1=bot_left[1], y1=bot_left[2], x2=top_right[1], y2=top_right[2])
+  CSG.CUnion(e1, e2) => begin
+    left_res = extents(e1)
+    right_res = extents(e2)
+    (x1=min(left_res.x1, right_res.x1),
+     x2=max(left_res.x2, right_res.x2),
+     y1=min(left_res.y1, right_res.y1),
+     y2=max(left_res.y2, right_res.y2))
+  end
+end
+
+lengths(e :: CSG.Expr) = begin
+  expr_extents = extents(e)
+  (w=(expr_extents.x2 - expr_extents.x1),
+   h=(expr_extents.y2 - expr_extents.y1))
 end
 
 function crit_pt_heights(e :: CSG.Expr)
@@ -103,6 +117,7 @@ function reeb_graph_of(e :: CSG.Expr)
   heights = crit_pt_heights(e)
   adjacent_diffs = (circshift(heights, -1) - heights)[1:end-1]
   epsilon = minimum(adjacent_diffs) / 2.
+  @assert epsilon != 0.
   # println(epsilon)
 
   prims = all_prims(e)
@@ -151,6 +166,8 @@ function reeb_graph_of(e :: CSG.Expr)
         # println("src_comps: $src_comps")
         # println("comp_root: $comp_root")
         # println("prev_frontier: $prev_frontier")
+        println("curr_y_pos: $curr_y_pos")
+        println("curr_y_neg: $curr_y_neg")
         v = prev_frontier[first(src_comps)]
         # TODO same here as above
         frontier[comp_root] = v
@@ -212,30 +229,71 @@ function reeb_graph_of(e :: CSG.Expr)
   return graph, edge_mult
 end
 
-
-# 2D version of torus-ish shape from GoodNotes
-c1 = CSG.CSquare(Point2(-2., 0.), Point2(2., 4.))
-c2 = CSG.CSquare(Point2(-5., 2.), Point2(-1., 6.))
-c3 = CSG.CSquare(Point2(1., 3.), Point2(5., 7.))
-c4 = CSG.CSquare(Point2(-2., 5.), Point2(2., 9.))
-test_expr = CSG.CUnion(CSG.CUnion(c1, c2), CSG.CUnion(c3, c4))
-
-graph, edge_mult = reeb_graph_of(test_expr)
-edgelabel = []
-for edge in edges(graph)
-  # println(edge.src)
-  # println(edge.dst)
-  push!(edgelabel, edge_mult[(edge.src,edge.dst)])
+function gen_square_at(s :: Number, center :: Point2)
+  return CSG.CSquare(
+    Point2(center[1] - s / 2., center[2] - s / 2.),
+    Point2(center[1] + s / 2., center[2] + s / 2.))
 end
 
-using GraphPlot
-nodelabel = 1:nv(graph)
-gplot(graph, nodelabel=nodelabel, edgelabel=edgelabel,
-  edgelabelc="white",
-  edgelabeldistx=1.,
-  edgelabeldisty=0.,
-  arrowlengthfrac=0.1
-  )
+function gen_torus()
+  # 2D version of torus-ish shape from GoodNotes
+  size = 4.
+  c1 = gen_square_at(size, Point2(0., 2.))
+  c2 = gen_square_at(size, Point2(-3., 4.))
+  c3 = gen_square_at(size, Point2(3., 5.))
+  c4 = gen_square_at(size, Point2(0., 7.))
+  return CSG.CUnion(CSG.CUnion(c1, c2), CSG.CUnion(c3, c4))
+end
+
+function gen_vert_line()
+  size = 4.
+  c1 = gen_square_at(size, Point2(0., 0.))
+  c2 = gen_square_at(size, Point2(3., 3.))
+  c3 = gen_square_at(size, Point2(0., 6.))
+  c4 = gen_square_at(size, Point2(-3., 9.))
+  return CSG.CUnion(CSG.CUnion(c1, c2), CSG.CUnion(c3, c4))
+end
+
+test_expr = gen_torus()
+
+using Plots
+rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
+
+expr_extents = extents(test_expr)
+println(expr_extents)
+x_range = expr_extents.x1:expr_extents.x2
+display(plot(x_range, LinRange(expr_extents.y1, expr_extents.y2, length(x_range)), opacity=0.))
+
+# display(plot!(rectangle(3,2,0,0), opacity=.5))
+
+# rectangle(x, y, w, h) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
+# plot!(rectangle(0,0,3,2), opacity=.5)
+# plot!(rectangle(3,2,0,0), opacity=.5)
+for prim in all_prims(test_expr)
+  lens = lengths(prim)
+  display(plot!(rectangle(
+    lens.w, lens.h,
+    prim.bot_left[1], prim.bot_left[2]),
+    opacity=.5))
+end
+
+
+#graph, edge_mult = reeb_graph_of(test_expr)
+#edgelabel = []
+#for edge in edges(graph)
+#  # println(edge.src)
+#  # println(edge.dst)
+#  push!(edgelabel, edge_mult[(edge.src,edge.dst)])
+#end
+#
+#using GraphPlot
+#nodelabel = 1:nv(graph)
+#gplot(graph, nodelabel=nodelabel, edgelabel=edgelabel,
+#  edgelabelc="white",
+#  edgelabeldistx=1.,
+#  edgelabeldisty=0.,
+#  arrowlengthfrac=0.1
+#  )
 
 # function plot_graph(vert_to_pos, graph)
 #   plot_current_mesh()
