@@ -17,12 +17,12 @@ end
 
 @data CritGeom begin
   CGPt(Point2)
-  CGLine(a :: Point2, b :: Point2)
+  CGLine(a :: Point3, b :: Point3)
 end
 
 @data Expr begin
-  CCircle(c :: Point2, r :: Int)
-  CSquare(bot_left :: Point2, top_right :: Point2)
+  CCircle(c :: Point3, r :: Int)
+  CSquare(bot_left :: Point3, top_right :: Point3)
   CDiff(Expr, Expr)
   CUnion(Expr, Expr)
 end

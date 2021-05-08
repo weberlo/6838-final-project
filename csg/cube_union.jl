@@ -11,15 +11,12 @@ using Combinatorics
 using Random
 
 extents(e :: CSG.Expr) = @match e begin
-  CSG.CSquare(bot_left, top_right) =>
-    (x1=bot_left[1], y1=bot_left[2], x2=top_right[1], y2=top_right[2])
+  CSG.CSquare(bot_left, top_right) => (lower=bot_left, upper=top_right)
   CSG.CUnion(e1, e2) => begin
     left_res = extents(e1)
     right_res = extents(e2)
-    (x1=min(left_res.x1, right_res.x1),
-     x2=max(left_res.x2, right_res.x2),
-     y1=min(left_res.y1, right_res.y1),
-     y2=max(left_res.y2, right_res.y2))
+    (lower=min.(left_res.lower, right_res.lower),
+     upper=max.(left_res.upper, right_res.upper))
   end
 end
 
@@ -28,6 +25,9 @@ lengths(e :: CSG.Expr) = begin
   (w=(expr_extents.x2 - expr_extents.x1),
    h=(expr_extents.y2 - expr_extents.y1))
 end
+
+to_center_sidelen(e :: CSG.Expr) =
+  (c = (e.bot_left + e.top_right) ./ 2, s = (e.top_right - e.bot_left)[1])
 
 function crit_pt_heights(e :: CSG.Expr)
   aux(e :: CSG.Expr) = @match e begin
@@ -51,25 +51,35 @@ function reeb_graph_of(e :: CSG.Expr)
       if prim.bot_left[2] > y || prim.top_right[2] < y
         continue
       else
-        push!(collisions, (i, (left=prim.bot_left[1], right=prim.top_right[1])))
+        # push!(collisions, (i, (left=prim.bot_left[1], right=prim.top_right[1])))
+        push!(collisions,
+          (i,
+            (x1=prim.bot_left[1],
+             x2=prim.top_right[1],
+             # since we're projecting onto the y plane, z becomes the y coordinate on that plane.
+             y1=prim.bot_left[3],
+             y2=prim.top_right[3]
+             )))
       end
     end
     return collisions
   end
 
-  function comp_union_find(intervals)
+  function intersects_with(s1, s2)
+    return s1.x1 < s2.x2 && s1.x2 > s2.x1 && s1.y1 < s2.y2 && s1.y2 > s2.y1
+  end
+
+  function comp_union_find(shapes)
     println("TODO stop shuffling intervals once your algorithm is robust to it")
     # NOTE we need to handle arbitrary orderings of shapes for when we move to 3D.
-    intervals = shuffle(intervals)
+    shapes = shuffle(shapes)
 
     res = DisjointSets()
-    for (i, _) in intervals
+    for (i, _) in shapes
       push!(res, i)
     end
-    for ((i1, s1), (i2, s2)) in combinations(intervals, 2)
-      if s1.right < s2.left || s1.left > s2.right
-        continue
-      else
+    for ((i1, s1), (i2, s2)) in combinations(shapes, 2)
+      if intersects_with(s1, s2)
         union!(res, i1, i2)
       end
     end
@@ -203,7 +213,34 @@ function reeb_graph_of(e :: CSG.Expr)
 end
 
 
-test_expr = gen_vert_line()
+test_expr = gen_4_torus()
+# show_csg(test_expr)
+
+
+using WGLMakie
+
+function show_csg(e :: CSG.Expr)
+  function draw_cube(s :: Number, c :: Point3)
+    cube = FRect3D(c, Vec3f0(s))
+    mesh!(cube, color=:blue)
+  end
+  expr_extents = extents(e)
+  bounds = Node([
+    Point3f0(expr_extents.lower),
+    Point3f0(expr_extents.upper)
+  ])
+  display(lines(bounds, linewidth=0, transparency=true, color=(:black, 0.0),
+      shading=true,
+      figure=(resolution=(700, 1000),),
+  ))
+  prims = all_prims(e)
+  for prim in prims
+    (c, s) = to_center_sidelen(prim)
+    draw_cube(s, c)
+  end
+end
+
 show_csg(test_expr)
+
 graph, edge_mult = reeb_graph_of(test_expr)
 show_graph(graph, edge_mult)
