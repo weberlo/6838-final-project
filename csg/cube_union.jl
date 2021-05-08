@@ -1,4 +1,6 @@
 include("./csg.jl")
+include("./shape_gen.jl")
+include("./plot_util.jl")
 
 using LinearAlgebra
 using GeometryBasics
@@ -6,11 +8,7 @@ using DataStructures
 using MLStyle
 using LightGraphs
 using Combinatorics
-
-# println(c1)
-# println(c2)
-# println(typeof(CSG.CUnion(c1, c2)))
-# reeb_graph_of()
+using Random
 
 extents(e :: CSG.Expr) = @match e begin
   CSG.CSquare(bot_left, top_right) =>
@@ -44,13 +42,7 @@ all_prims(e :: CSG.Expr) = @match e begin
   CSG.CUnion(e1, e2) => vcat(all_prims(e1), all_prims(e2))
 end
 
-# num_crit_pts(e :: CSG.Expr) = @match e begin
-#   CSG.CSquare(_) => 2
-#   CSG.CUnion(e1, e2) => num_crit_pts(e1) + num_crit_pts(e2)
-# end
 num_crit_pts(e :: CSG.Expr) = length(crit_pt_heights(e))
-
-using Random
 
 function reeb_graph_of(e :: CSG.Expr)
   function collisions_at(y :: Number, prims)
@@ -84,14 +76,6 @@ function reeb_graph_of(e :: CSG.Expr)
     return res
   end
 
-  # function all_comps(uf)
-  #   res = Set()
-  #   for elt in uf
-  #     res = res ∪ find_root!(uf, elt)
-  #   end
-  #   return res
-  # end
-
   function calc_root_to_members(uf)
     res = DefaultDict(Vector{Int})
     for elt in uf
@@ -119,7 +103,6 @@ function reeb_graph_of(e :: CSG.Expr)
   adjacent_diffs = (circshift(heights, -1) - heights)[1:end-1]
   epsilon = minimum(filter(x -> x != 0., adjacent_diffs)) / 2.
   @assert epsilon != 0.
-  # println(epsilon)
 
   prims = all_prims(e)
 
@@ -136,15 +119,9 @@ function reeb_graph_of(e :: CSG.Expr)
 
     neg_collns = collisions_at(curr_y_neg, prims)
     pos_collns = collisions_at(curr_y_pos, prims)
-    # println("neg_collns: $neg_collns")
-    # println("pos_collns: $pos_collns")
 
     neg_uf = comp_union_find(neg_collns)
     pos_uf = comp_union_find(pos_collns)
-
-    # println(in_same_set(neg_uf, 2, 3))
-    # println(in_same_set(pos_uf, 2, 3))
-    # vert_to_pos = Dict()
 
     pos_root_to_membs = calc_root_to_members(pos_uf)
     for (comp_root, membs) in pos_root_to_membs
@@ -156,8 +133,8 @@ function reeb_graph_of(e :: CSG.Expr)
       end
 
       if length(src_comps) == 0
+        # println("at local min")
         # at a local min, so spawn new vertex
-        println("at local min")
         v = insert_vert(graph)
         # we need to map *all* members of the component (i.e., not just
         # the root) to `v`, because the component root can potentially change
@@ -166,20 +143,17 @@ function reeb_graph_of(e :: CSG.Expr)
           frontier[memb] = v
         end
       elseif length(src_comps) == 1
-        # get vertex index of source component
+        # no downward change, so thread vertex index through
         println("no downward change")
         v = prev_frontier[first(src_comps)]
         for memb in membs
           frontier[memb] = v
         end
       else  # length(src_comps) > 1
-        println("at a join point")
+        # println("at a join point")
         # topology changed and we're at a *join* point
         v = insert_vert(graph)
         for src_comp_root in src_comps
-          # println("src_comp_root: $(src_comp_root)")
-          # println("prev_frontier[src_comp_root]: $(prev_frontier[src_comp_root])")
-          # println("v: $(v)")
           incr_edge_mult(graph, edge_mult,
             prev_frontier[src_comp_root], v)
         end
@@ -199,19 +173,19 @@ function reeb_graph_of(e :: CSG.Expr)
       end
 
       if length(dst_comps) == 0
-        println("at a local max")
+        # println("at a local max")
         # at a local max, so kill this thread
         v = insert_vert(graph)
         # println(prev_frontier)
         incr_edge_mult(graph, edge_mult, prev_frontier[comp_root], v)
       elseif length(dst_comps) == 1
-        println("no upward change")
+        # println("no upward change")
         # do nothing (see GoodNotes)
         # TODO type up explanation from notes
         nothing
       else  # length(dst_comps) > 1
         # topology changed and we're at a *fork* point
-        println("at a fork point")
+        # println("at a fork point")
         v = insert_vert(graph)
         incr_edge_mult(graph, edge_mult, prev_frontier[comp_root], v)
         for dst_comp_root in dst_comps
@@ -221,126 +195,15 @@ function reeb_graph_of(e :: CSG.Expr)
       end
     end
 
-    println()
+    # println()
     prev_frontier = frontier
   end
 
   return graph, edge_mult
 end
 
-function gen_square_at(s :: Number, center :: Point2)
-  return CSG.CSquare(
-    Point2(center[1] - s / 2., center[2] - s / 2.),
-    Point2(center[1] + s / 2., center[2] + s / 2.))
-end
-
-function gen_torus()
-  # 2D version of torus-ish shape from GoodNotes
-  size = 4.
-  c1 = gen_square_at(size, Point2(0., 2.))
-  c2 = gen_square_at(size, Point2(-3., 4.))
-  c3 = gen_square_at(size, Point2(3., 5.))
-  c4 = gen_square_at(size, Point2(0., 7.))
-  return CSG.CUnion(CSG.CUnion(c1, c2), CSG.CUnion(c3, c4))
-end
-
-function gen_vert_line()
-  size = 4.
-  c1 = gen_square_at(size, Point2(0., 0.))
-  c2 = gen_square_at(size, Point2(3., 3.))
-  c3 = gen_square_at(size, Point2(0., 6.))
-  c4 = gen_square_at(size, Point2(-3., 9.))
-  return CSG.CUnion(CSG.CUnion(c1, c2), CSG.CUnion(c3, c4))
-end
-
-function gen_fork_join()
-  size = 4.
-  c1 = gen_square_at(size, Point2(-3., 0.))
-  c2 = gen_square_at(size, Point2(3., 0.))
-  c3 = gen_square_at(size, Point2(0., 3.))
-  c4 = gen_square_at(size, Point2(6., 3.))
-  return CSG.CUnion(CSG.CUnion(c1, c2), CSG.CUnion(c3, c4))
-end
-
-function gen_fork()
-  size = 4.
-  # c1 = gen_square_at(size, Point2(-3., 0.))
-  c2 = gen_square_at(size, Point2(3., 0.))
-  c3 = gen_square_at(size, Point2(0., 3.))
-  c4 = gen_square_at(size, Point2(6., 3.))
-  return CSG.CUnion(c2, CSG.CUnion(c3, c4))
-end
-
-function gen_join()
-  size = 4.
-  c1 = gen_square_at(size, Point2(-3., 0.))
-  c2 = gen_square_at(size, Point2(3., 0.))
-  c3 = gen_square_at(size, Point2(0., 3.))
-  # c4 = gen_square_at(size, Point2(6., 3.))
-  return CSG.CUnion(CSG.CUnion(c1, c2), c3)
-end
 
 test_expr = gen_vert_line()
-
-using Plots
-
-function show_csg(e :: CSG.Expr)
-  rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
-
-  expr_extents = extents(e)
-  println(expr_extents)
-  x_range = expr_extents.x1:expr_extents.x2
-  display(plot(x_range, LinRange(expr_extents.y1, expr_extents.y2, length(x_range)), opacity=0.))
-
-  for prim in all_prims(e)
-    lens = lengths(prim)
-    display(plot!(rectangle(
-      lens.w, lens.h,
-      prim.bot_left[1], prim.bot_left[2]),
-      opacity=.5))
-  end
-end
-
 show_csg(test_expr)
-
 graph, edge_mult = reeb_graph_of(test_expr)
-
-using GraphPlot
-
-function show_graph(graph, edge_mult)
-  edgelabel = []
-  for edge in edges(graph)
-    push!(edgelabel, edge_mult[(edge.src,edge.dst)])
-  end
-
-  nodelabel = 1:nv(graph)
-  gplot(graph, nodelabel=nodelabel, edgelabel=edgelabel,
-    edgelabelc="white",
-    edgelabeldistx=1.,
-    edgelabeldisty=0.,
-    arrowlengthfrac=0.1
-  )
-end
-
 show_graph(graph, edge_mult)
-
-# function plot_graph(vert_to_pos, graph)
-#   plot_current_mesh()
-#   # bounds = Node([
-#   #   Point3f0(0., 0., 0.),
-#   #   Point3f0(15., 0., 0.),
-#   #   Point3f0(-15., 0., 0.),
-#   #   Point3f0(0., 0., 20.),
-#   #   Point3f0(0., 0., -30.),
-#   #   Point3f0(0., 20., 0.),
-#   #   Point3f0(0., -15., 0.),
-#   # ])
-#   # display(lines(bounds, linewidth=0, transparency=true, color=(:black, 0.0),
-#   #     shading=true,
-#   #     figure=(resolution=(700, 1000),),
-#   # ))
-#   crits = crit_points(X, T)
-#   plot_spheres(crit_idxs(crit_mins(crits)), :yellow)
-#   plot_spheres(crit_idxs(crit_maxs(crits)), :green)
-#   plot_spheres(crit_idxs(crit_saddles(crits)), :blue)
-# end
