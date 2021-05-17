@@ -96,49 +96,47 @@ function crit_areas(X, T)
         continue
       end
       if are_adjacent(p1.idx, p2.idx, T) && p1.val == p2.val
-        # println("$i1 and $i2 in same crit area")
         union!(crit_areas, p1, p2)
       end
     end
   end
 
   root_to_membs = calc_root_to_members(crit_areas)
-  res = map(pts -> (type=pts[1].type, idxs=map(p -> p.idx, pts), val=pts[1].val), values(root_to_membs))
+  res = map(
+    pts -> (type=pts[1].type, idxs=map(p -> p.idx, pts), val=pts[1].val),
+    values(root_to_membs))
   # sort by the critical values
   sort!(res, by = x -> x.val)
-  # println(res)
   return res
+end
+
+function area_link(crit_area, X, T)
+  @assert false "TODO impl"
 end
 
 
 """
 Computes the *lower* critical set of a critical point `crit_pt`.
 """
-function crit_set(crit_pt, X, T)
-  if crit_pt[1] == crit_min || crit_pt[1] == crit_max
+function crit_set(crit_area, X, T)
+  if crit_area.type == crit_min || crit_area.type == crit_max
     # critical set of min and max is point itself
     #
-    # TODO they say we should include the closure of the star of these
+    # TODO Hajij and Rosen say we should include the closure of the star of these
     # vertices. should we actually?
-    return Set(crit_pt[2][1])
+    return Set(crit_area.idxs)
   end
   # we know we're working with a saddle point now
-  crit_data = crit_pt[2]
-  crit_idx = crit_data[1]
-  crit_val = crit_data[2]
-  links = vert_links(X, T)
-  curr_link = links[crit_idx]
+  curr_link = area_link(crit_area, X, T)
   to_visit = Queue{Int32}()
   for idx in curr_link
-    if dot(X[idx,:], crit_H) < crit_val
+    if dot(X[idx,:], crit_H) < crit_area.val
       enqueue!(to_visit, idx)
     end
   end
 
   visited = Set(first(to_visit))
   res = Set()
-  # println(to_visit)
-  # println(isempty(to_visit))
   while !isempty(to_visit)
     curr_vert_idx = dequeue!(to_visit)
     curr_link = links[curr_vert_idx]
@@ -152,12 +150,12 @@ function crit_set(crit_pt, X, T)
     for j = 1:size(curr_link, 1)
       curr_neighb_idx = curr_link[j]
       curr_neighb_val = dot(X[curr_neighb_idx, :], crit_H)
-      if curr_neighb_val < crit_val && !(curr_neighb_idx in visited)
+      if curr_neighb_val < crit_area.val && !(curr_neighb_idx in visited)
         # unconditionally add the vertex to visited
         push!(visited, curr_neighb_idx)
         enqueue!(to_visit, curr_neighb_idx)
       end
-      if curr_neighb_val > crit_val
+      if curr_neighb_val > crit_area.val
         any_above = true
       end
     end
@@ -175,16 +173,14 @@ function reeb_graph(X, T)
   crits = crit_areas(X, T)
   num_crits = size(crits, 1)
   crit_sets = Array{Set}(undef, num_crits)
-  # all_crit_sets = Array{Array{Int64}}(undef, )
   for i = 1:num_crits
     crit_sets[i] = crit_set(crits[i], X, T)
   end
-  # println(crit_sets)
 
   res = SimpleGraph(num_crits)
 
-  # TODO I don't think we need the -1
-  for i = 1:num_crits-1
+  # TODO we used to have a -1 here. make sure we didn't need it.
+  for i = 1:num_crits
     curr_crit = crits[i]
     curr_crit_tag = curr_crit[1]
 
@@ -195,22 +191,12 @@ function reeb_graph(X, T)
 
     if curr_crit_tag == crit_min
       # only need one ascending path if at minimum
-      p = X[curr_crit_vert_idx,:]
-      link = links[curr_crit_vert_idx]
-      num_neighbs = size(link, 1)
-      link_vals = zeros(num_neighbs)
-      p_val = dot(p, crit_H)
-      for (j, neighb_X_idx) in enumerate(link)
-        np = X[neighb_X_idx,:]
-        np_val = dot(np, crit_H)
-        link_vals[j] = np_val - p_val
-      end
-      # println(link_vals)
-
+      println("A")
       push!(seed_idxs, curr_crit_vert_idx)
     elseif curr_crit_tag == crit_max
       # discount all maxima from this *outer* loop (but we'll still visit them
       # as destinations in the inner loops)
+      println("B")
       continue
     else
       # TODO need to restructure code to compute *multiple* ascending paths for saddles
@@ -231,9 +217,7 @@ function reeb_graph(X, T)
       # shift to start with a negative vertex, so we have all of the positive
       # groups contiguous
       offs = findfirst(map(x -> x < 0, link_vals)) - 1
-      # println(link_vals)
       link_vals = circshift(link_vals, -offs)
-      # println(link_vals)
       last_val = link_vals[1]
       group_best_val = -1
       group_best_idx = 0
@@ -252,10 +236,6 @@ function reeb_graph(X, T)
         end
         last_val = curr_val
       end
-      # println(size(seed_idxs))
-      # println(seed_idxs)
-      # println(seed_idxs)
-      # println()
     end
 
     # follow each ascending path (each given by a seed idx) upwards to the next
@@ -266,7 +246,9 @@ function reeb_graph(X, T)
 
       for j = i+1:num_crits
         next_crit_set = crit_sets[j]
-        next_crit_val = crits[j][2][2]
+        next_crit_val = crits[j].val
+        println("next: $next_crit_val")
+        println("next_crit_set: $next_crit_set")
         while curr_val < next_crit_val && !(curr_vert_idx in next_crit_set)
           was_update = false
           # greedily climb to highest neighbor in link
@@ -277,6 +259,8 @@ function reeb_graph(X, T)
             neighb_idx = curr_link[k]
             neighb_val = dot(X[neighb_idx, :], crit_H)
             if neighb_val > curr_val
+              println("neighb_val: $neighb_val")
+              println("neighb_idx: $neighb_idx")
               curr_val = neighb_val
               curr_vert_idx = neighb_idx
               was_update = true

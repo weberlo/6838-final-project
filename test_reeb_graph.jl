@@ -74,12 +74,16 @@ end
 
 function plot_spheres(idxs, color)
   for X_idx in idxs
-    mesh!(Sphere(Point3f0(X[X_idx,:]), 0.5f0), transparency=false, color=color)
+    # mesh!(Sphere(Point3f0(X[X_idx,:]), 0.5f0), transparency=false, color=color)
+    plot_sphere_by_pos(Point3f0(X[X_idx,:]), color)
   end
 end
 
+function plot_sphere_by_pos(pos, color)
+  mesh!(Sphere(pos, 0.5f0), transparency=false, color=color)
+end
 
-function plot_crit_points()
+function plot_crit_areas()
   plot_current_mesh()
   # bounds = Node([
   #   Point3f0(0., 0., 0.),
@@ -94,10 +98,17 @@ function plot_crit_points()
   #     shading=true,
   #     figure=(resolution=(700, 1000),),
   # ))
-  crits = crit_points(X, T)
-  plot_spheres(crit_idxs(crit_mins(crits)), :yellow)
-  plot_spheres(crit_idxs(crit_maxs(crits)), :green)
-  plot_spheres(crit_idxs(crit_saddles(crits)), :blue)
+  crits = crit_areas(X, T)
+  for crit_area in crits
+    if crit_area.type == crit_min
+      color = :yellow
+    elseif crit_area.type == crit_max
+      color = :green
+    elseif crit_area.type == crit_saddle
+      color = :blue
+    end
+    plot_sphere_by_pos(avg_of(crit_area.idxs, X), color)
+  end
 end
 
 
@@ -110,18 +121,31 @@ function plot_crit_sets()
 end
 
 
-plot_crit_points()
+function avg_of(idxs, X)
+  res = Point3f0(0.)
+  n = size(idxs, 1)
+  for i = 1:n
+    res += (1. / n) * X[idxs[i],:]
+  end
+  return res
+end
+
+
+plot_crit_areas()
 # plot_current_mesh()
 
 rg = reeb_graph(X, T)
-crits = crit_points(X, T)
+crits = crit_areas(X, T)
+println(crits)
 for e in edges(rg)
   println(e)
   src_crits_idx = e.src
   dst_crits_idx = e.dst
-  src_vert_idx = crits[src_crits_idx][2][1]
-  dst_vert_idx = crits[dst_crits_idx][2][1]
-  line_seg = Node([Point3f0(X[src_vert_idx, :]), Point3f0(X[dst_vert_idx, :])])
+  src_vert_idxs = crits[src_crits_idx].idxs
+  dst_vert_idxs = crits[dst_crits_idx].idxs
+  src_pos = avg_of(src_vert_idxs, X)
+  dst_pos = avg_of(dst_vert_idxs, X)
+  line_seg = Node([src_pos, dst_pos])
   lines!(line_seg, linewidth=800)
 end
 println(rg)
