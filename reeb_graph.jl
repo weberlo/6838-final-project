@@ -95,65 +95,88 @@ function crit_areas(X, T)
   nt = size(T, 1)
   links = vert_links(X, T)
 
-  crit_pts = []
-  for i = 1:nv
-    p = X[i,:]
-    p_val = dot(p, crit_H)
-    link = links[i]
-    classified_pt = classify_by_link(p_val, link, X, T, false)
-
-    if classified_pt !== nothing
-      push!(crit_pts, (classified_pt..., idx=i))
-    end
-  end
-
   # form critical areas from critical points
   crit_areas = DisjointSets()
-  for p in crit_pts
-    push!(crit_areas, p)
-  end
-  for p1 in crit_pts
-    for p2 in crit_pts
-      if p1.idx == p2.idx
-        continue
-      end
-      if are_adjacent(p1.idx, p2.idx, T) && p1.val == p2.val
-        union!(crit_areas, p1, p2)
-      end
-    end
+  for i = 1:size(X,1)
+    push!(crit_areas, i)
   end
 
+  for i = 1:size(T,1)
+    p_vals = []
+    for j = 1:3
+      push!(p_vals, dot(X[T[i,j],:], crit_H))
+    end
+    if p_vals[1] == p_vals[2] && p_vals[1] == p_vals[3]
+      union!(crit_areas, T[i,1], T[i,2])
+      union!(crit_areas, T[i,2], T[i,3])
+    end
+  end
+  # for i = 1:size(X,1)
+  #   for j = 1:size(X,1)
+  #     if i == j
+  #       continue
+  #     end
+  #     p1 = X[i,:]
+  #     p2 = X[j,:]
+  #     p1_val = dot(p1, crit_H)
+  #     p2_val = dot(p2, crit_H)
+  #     if are_adjacent(i, j, T) && p1_val == p2_val
+  #       union!(crit_areas, i, j)
+  #     end
+  #   end
+  # end
+
   root_to_membs = calc_root_to_members(crit_areas)
+
+  # crit_pts = []
+  # for i = 1:nv
+  #   p = X[i,:]
+  #   p_val = dot(p, crit_H)
+  #   link = links[i]
+  #   classified_pt = classify_by_link(p_val, link, X, T, false)
+
+  #   if classified_pt !== nothing
+  #     push!(crit_pts, (classified_pt..., idx=i))
+  #   end
+  # end
+
+
   # TODO it looks like we might be losing the NamedTuple multiplicity field here?
-  res = map(
-    pts -> (type=pts[1].type, idxs=map(p -> p.idx, pts), val=pts[1].val),
-    values(root_to_membs))
-  filtered_res = []
-  for crit_area in res
-    link = area_link(crit_area, X, T)
+  # res = map(
+  #   pts -> (type=pts[1].type, idxs=map(p -> p.idx, pts), val=pts[1].val),
+  #   values(root_to_membs))
+  res = []
+  for crit_area_idxs in values(root_to_membs)
+    # println("crit_area: $crit_area")
+    link = area_link(crit_area_idxs, X, T)
     # println(link)
-    p_val = dot(X[crit_area.idxs[1],:], crit_H)
+    p_val = dot(X[crit_area_idxs[1],:], crit_H)
+    # println("link: $link")
+    # println("p_val: $p_val")
     classified_area = classify_by_link(p_val, link, X, T, true)
     if classified_area !== nothing
-      push!(filtered_res, (classified_area..., idxs=crit_area.idxs))
+      # println("classified_area: $classified_area")
+      push!(res, (classified_area..., idxs=crit_area_idxs))
     end
     # println(classified_area === nothing)
   end
   # sort by the critical values
-  sort!(filtered_res, by = x -> x.val)
-  return filtered_res
+  sort!(res, by = x -> x.val)
+  return res
 end
 
-function area_link(crit_area, X, T)
+function area_link(crit_area_idxs, X, T)
+  println("HERE")
+  println(crit_area_idxs)
   star = Set()
-  for idx in crit_area.idxs
+  for idx in crit_area_idxs
     for i = 1:size(T, 1)
       if idx in T[i,:]
         star = star ∪ Set(T[i,:])
       end
     end
   end
-  inner = Set(crit_area.idxs)
+  inner = Set(crit_area_idxs)
   unordered_link = setdiff(star, inner)
   # println(inner)
   # println(unordered_link)
@@ -192,7 +215,8 @@ function crit_set(crit_area, X, T)
     return Set(crit_area.idxs)
   end
   # we know we're working with a saddle point now
-  curr_link = area_link(crit_area, X, T)
+  curr_link = area_link(crit_area.idxs, X, T)
+  println("curr_link: $curr_link")
   to_visit = Queue{Int32}()
   for idx in curr_link
     if dot(X[idx,:], crit_H) < crit_area.val
@@ -204,7 +228,8 @@ function crit_set(crit_area, X, T)
   res = Set()
   while !isempty(to_visit)
     curr_vert_idx = dequeue!(to_visit)
-    curr_link = links[curr_vert_idx]
+    # curr_link = links[curr_vert_idx]
+
     # we only add the current vertex to the result if they
     # have a neighbor *above* the tangent plane.
     any_above = false
@@ -266,7 +291,10 @@ function reeb_graph(X, T)
       # TODO massage this code into current code to compute seed idxs (an idx
       # for the highest vertex in each group)
       p = X[curr_crit_vert_idx,:]
-      link = links[curr_crit_vert_idx]
+
+      # link = links[curr_crit_vert_idx]
+      link = area_link(curr_crit.idxs, X, T)
+
       num_neighbs = size(link, 1)
       link_vals = zeros(num_neighbs)
       p_val = dot(p, crit_H)
@@ -307,6 +335,7 @@ function reeb_graph(X, T)
       curr_vert_idx = seed_idx
       # println(seed_idxs)
       curr_val = dot(X[curr_vert_idx, :], crit_H)
+      visited = Set()
 
       for j = i+1:num_crits
         next_crit_set = crit_sets[j]
@@ -322,13 +351,20 @@ function reeb_graph(X, T)
             # the highest vertex.
             neighb_idx = curr_link[k]
             neighb_val = dot(X[neighb_idx, :], crit_H)
-            if neighb_val > curr_val
-              println("neighb_val: $neighb_val")
-              println("neighb_idx: $neighb_idx")
+            if neighb_val >= curr_val # && !(neighb_idx in visited)
+              # println("neighb_val: $neighb_val")
+              # println("neighb_idx: $neighb_idx")
+              # visited = visited ∪ neighb_idx
               curr_val = neighb_val
               curr_vert_idx = neighb_idx
               was_update = true
             end
+          end
+          # println(curr_val)
+          if !was_update
+            # for vert_idx in inner
+              mesh!(Sphere(Point3f0(X[curr_vert_idx,:]), 0.5f0), transparency=false, color=:green)
+            # end
           end
           @assert was_update "no higher vertex found in link!"
         end

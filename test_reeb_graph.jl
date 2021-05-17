@@ -19,7 +19,10 @@ include("mesh_io.jl")
 
 # model = load("models/cube.off")
 # model = load("models/two_cubes.off")
-model = load("models/fork.off")
+# model = load("models/fork.off")
+# model = load("models/join.off")
+# model = load("models/torusish.off")
+model = load("models/torus.off")
 X = decompose(Point3f0, model)
 T = decompose(TriangleFace{Int}, model)
 
