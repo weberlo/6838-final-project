@@ -11,12 +11,30 @@ include("mesh_utils.jl")
 # crit_H = Vec3f0(0., 1., 0.)
 crit_H = Vec3f0(0., 0., 1.)
 
-function crit_points(X, T)
+function are_adjacent(v1_idx, v2_idx, T)
+  for i = 1:size(T,1)
+    if v1_idx in T[i,:] && v2_idx in T[i,:]
+      return true
+    end
+  end
+  return false
+end
+
+# TODO refactor into uf_util.jl
+function calc_root_to_members(uf)
+  res = DefaultDict(Vector)
+  for elt in uf
+    push!(res[find_root!(uf, elt)], elt)
+  end
+  return res
+end
+
+function crit_areas(X, T)
   nv = size(X, 1)
   nt = size(T, 1)
   links = vert_links(X, T)
 
-  res = []
+  crit_pts = []
   for i = 1:nv
     p = X[i,:]
     num_neighbs = size(links[i], 1)
@@ -46,9 +64,9 @@ function crit_points(X, T)
       end
     end
     if sum(sides) + num_degen == num_neighbs
-      push!(res, (crit_min, (i, p_val)))
+      push!(crit_pts, (type=crit_min, idx=i, val=p_val))
     elseif sum(sides) - num_degen == -num_neighbs
-      push!(res, (crit_max, (i, p_val)))
+      push!(crit_pts, (type=crit_max, idx=i, val=p_val))
     else
       group_count = 0
       last = sides[1]
@@ -62,12 +80,33 @@ function crit_points(X, T)
       @assert (group_count % 2 == 0) "group count was not multiple of 2!"
       if group_count > 2
         multiplicity = (group_count - 2) / 2
-        push!(res, (crit_saddle, (i, p_val, multiplicity)))
+        push!(crit_pts, (type=crit_saddle, idx=i, val=p_val, mult=multiplicity))
       end
     end
   end
+
+  # form critical areas from critical points
+  crit_areas = DisjointSets()
+  for p in crit_pts
+    push!(crit_areas, p)
+  end
+  for p1 in crit_pts
+    for p2 in crit_pts
+      if p1.idx == p2.idx
+        continue
+      end
+      if are_adjacent(p1.idx, p2.idx, T) && p1.val == p2.val
+        # println("$i1 and $i2 in same crit area")
+        union!(crit_areas, p1, p2)
+      end
+    end
+  end
+
+  root_to_membs = calc_root_to_members(crit_areas)
+  res = map(pts -> (type=pts[1].type, idxs=map(p -> p.idx, pts), val=pts[1].val), values(root_to_membs))
   # sort by the critical values
-  sort!(res, by = x -> x[2][2])
+  sort!(res, by = x -> x.val)
+  # println(res)
   return res
 end
 
@@ -133,7 +172,7 @@ end
 
 function reeb_graph(X, T)
   links = vert_links(X, T)
-  crits = crit_points(X, T)
+  crits = crit_areas(X, T)
   num_crits = size(crits, 1)
   crit_sets = Array{Set}(undef, num_crits)
   # all_crit_sets = Array{Array{Int64}}(undef, )
@@ -156,6 +195,18 @@ function reeb_graph(X, T)
 
     if curr_crit_tag == crit_min
       # only need one ascending path if at minimum
+      p = X[curr_crit_vert_idx,:]
+      link = links[curr_crit_vert_idx]
+      num_neighbs = size(link, 1)
+      link_vals = zeros(num_neighbs)
+      p_val = dot(p, crit_H)
+      for (j, neighb_X_idx) in enumerate(link)
+        np = X[neighb_X_idx,:]
+        np_val = dot(np, crit_H)
+        link_vals[j] = np_val - p_val
+      end
+      # println(link_vals)
+
       push!(seed_idxs, curr_crit_vert_idx)
     elseif curr_crit_tag == crit_max
       # discount all maxima from this *outer* loop (but we'll still visit them
@@ -180,9 +231,9 @@ function reeb_graph(X, T)
       # shift to start with a negative vertex, so we have all of the positive
       # groups contiguous
       offs = findfirst(map(x -> x < 0, link_vals)) - 1
-      println(link_vals)
+      # println(link_vals)
       link_vals = circshift(link_vals, -offs)
-      println(link_vals)
+      # println(link_vals)
       last_val = link_vals[1]
       group_best_val = -1
       group_best_idx = 0

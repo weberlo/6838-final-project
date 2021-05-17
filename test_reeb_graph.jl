@@ -17,7 +17,8 @@ include("mesh_io.jl")
 # rot_mat = RotX(-0.3)
 
 
-model = load("models/cube.off")
+# model = load("models/cube.off")
+model = load("models/two_cubes.off")
 X = decompose(Point3f0, model)
 T = decompose(TriangleFace{Int}, model)
 
@@ -27,8 +28,8 @@ T = decompose(TriangleFace{Int}, model)
 
 X = [X[i][j] for i = 1:length(X), j = 1:3]
 T = [T[i][j] for i = 1:length(T), j = 1:3]
-println(size(X))
-println(size(T))
+# println(size(X))
+# println(size(T))
 
 
 # vertices = X
