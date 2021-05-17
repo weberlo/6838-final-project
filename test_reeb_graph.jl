@@ -4,7 +4,7 @@ using WGLMakie
 using Rotations
 
 include("mesh_utils.jl")
-include("crit_pts.jl")
+include("reeb_graph.jl")
 include("mesh_io.jl")
 
 # X, T = MeshUtils.readoff("models/sphere.off")
@@ -17,10 +17,13 @@ include("mesh_io.jl")
 # rot_mat = RotX(-0.3)
 
 
-
-model = load("models/lozenge.off")
+model = load("models/cube.off")
 X = decompose(Point3f0, model)
 T = decompose(TriangleFace{Int}, model)
+
+# rot_mat = RotX(-0.3) * RotY(-0.3)
+# X = map(x -> Point3f0(rot_mat * x), X)
+
 
 X = [X[i][j] for i = 1:length(X), j = 1:3]
 T = [T[i][j] for i = 1:length(T), j = 1:3]
@@ -107,6 +110,7 @@ end
 
 
 plot_crit_points()
+# plot_current_mesh()
 
 rg = reeb_graph(X, T)
 crits = crit_points(X, T)
