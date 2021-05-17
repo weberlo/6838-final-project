@@ -29,6 +29,67 @@ function calc_root_to_members(uf)
   return res
 end
 
+# TODO I think we can do only one round of classification if we restructure our algorithm
+function classify_by_link(p_val, link, X, T, post_processing)
+  num_neighbs = size(link, 1)
+  sides = zeros(num_neighbs)
+  num_degen = 0
+  for (j, neighb_X_idx) in enumerate(link)
+    np = X[neighb_X_idx,:]
+    np_val = dot(np, crit_H)
+    if np_val > p_val
+      sides[j] = 1
+    elseif np_val < p_val
+      sides[j] = -1
+    else
+      # display(mesh(
+      #     X, T,
+      #     shading=true,
+      #     transparency=true,
+      #     figure=(resolution=(700, 1000),),
+      #     color = (:red, 0.1)
+      # ))
+      # mesh!(Sphere(Point3f0(p), 0.5f0), transparency=false)
+      # mesh!(Sphere(Point3f0(np), 0.5f0), transparency=false)
+      # @assert false "multiple vertices with same value!"
+      sides[j] = 0
+      num_degen += 1
+    end
+  end
+  if sum(sides) + num_degen == num_neighbs
+    if num_degen > 0 && post_processing
+      return nothing
+    else
+      # push!(crit_pts, (type=crit_min, idx=i, val=p_val))
+      return (type=crit_min, val=p_val)
+    end
+  elseif sum(sides) - num_degen == -num_neighbs
+    if num_degen > 0 && post_processing
+      return nothing
+    else
+      # push!(crit_pts, (type=crit_max, idx=i, val=p_val))
+      return (type=crit_max, val=p_val)
+    end
+  else
+    group_count = 0
+    last = sides[1]
+    for j = 2:(num_neighbs+1)
+      curr = sides[mod1(j, num_neighbs)]
+      if sides[mod1(j, num_neighbs)] != last && last != 0
+        group_count += 1
+      end
+      last = curr
+    end
+    @assert (group_count % 2 == 0) "group count was not multiple of 2!"
+    if group_count > 2
+      multiplicity = (group_count - 2) / 2
+      # push!(crit_pts, (type=crit_saddle, idx=i, val=p_val, mult=multiplicity))
+      return (type=crit_saddle, val=p_val, mult=multiplicity)
+    end
+  end
+  return nothing
+end
+
 function crit_areas(X, T)
   nv = size(X, 1)
   nt = size(T, 1)
@@ -37,51 +98,12 @@ function crit_areas(X, T)
   crit_pts = []
   for i = 1:nv
     p = X[i,:]
-    num_neighbs = size(links[i], 1)
-    sides = zeros(num_neighbs)
     p_val = dot(p, crit_H)
-    num_degen = 0
-    for (j, neighb_X_idx) in enumerate(links[i])
-      np = X[neighb_X_idx,:]
-      np_val = dot(np, crit_H)
-      if np_val > p_val
-        sides[j] = 1
-      elseif np_val < p_val
-        sides[j] = -1
-      else
-        # display(mesh(
-        #     X, T,
-        #     shading=true,
-        #     transparency=true,
-        #     figure=(resolution=(700, 1000),),
-        #     color = (:red, 0.1)
-        # ))
-        # mesh!(Sphere(Point3f0(p), 0.5f0), transparency=false)
-        # mesh!(Sphere(Point3f0(np), 0.5f0), transparency=false)
-        # @assert false "multiple vertices with same value!"
-        sides[j] = 0
-        num_degen += 1
-      end
-    end
-    if sum(sides) + num_degen == num_neighbs
-      push!(crit_pts, (type=crit_min, idx=i, val=p_val))
-    elseif sum(sides) - num_degen == -num_neighbs
-      push!(crit_pts, (type=crit_max, idx=i, val=p_val))
-    else
-      group_count = 0
-      last = sides[1]
-      for j = 2:(num_neighbs+1)
-        curr = sides[mod1(j, num_neighbs)]
-        if sides[mod1(j, num_neighbs)] != last && last != 0
-          group_count += 1
-        end
-        last = curr
-      end
-      @assert (group_count % 2 == 0) "group count was not multiple of 2!"
-      if group_count > 2
-        multiplicity = (group_count - 2) / 2
-        push!(crit_pts, (type=crit_saddle, idx=i, val=p_val, mult=multiplicity))
-      end
+    link = links[i]
+    classified_pt = classify_by_link(p_val, link, X, T, false)
+
+    if classified_pt !== nothing
+      push!(crit_pts, (classified_pt..., idx=i))
     end
   end
 
@@ -102,16 +124,59 @@ function crit_areas(X, T)
   end
 
   root_to_membs = calc_root_to_members(crit_areas)
+  # TODO it looks like we might be losing the NamedTuple multiplicity field here?
   res = map(
     pts -> (type=pts[1].type, idxs=map(p -> p.idx, pts), val=pts[1].val),
     values(root_to_membs))
+  filtered_res = []
+  for crit_area in res
+    link = area_link(crit_area, X, T)
+    # println(link)
+    p_val = dot(X[crit_area.idxs[1],:], crit_H)
+    classified_area = classify_by_link(p_val, link, X, T, true)
+    if classified_area !== nothing
+      push!(filtered_res, (classified_area..., idxs=crit_area.idxs))
+    end
+    # println(classified_area === nothing)
+  end
   # sort by the critical values
-  sort!(res, by = x -> x.val)
-  return res
+  sort!(filtered_res, by = x -> x.val)
+  return filtered_res
 end
 
 function area_link(crit_area, X, T)
-  @assert false "TODO impl"
+  star = Set()
+  for idx in crit_area.idxs
+    for i = 1:size(T, 1)
+      if idx in T[i,:]
+        star = star ∪ Set(T[i,:])
+      end
+    end
+  end
+  inner = Set(crit_area.idxs)
+  unordered_link = setdiff(star, inner)
+  # println(inner)
+  # println(unordered_link)
+
+  # if 3 in crit_area.idxs
+  #   for vert_idx in inner
+  #     mesh!(Sphere(Point3f0(X[vert_idx,:]), 0.5f0), transparency=false, color=:green)
+  #   end
+  #   for vert_idx in unordered_link
+  #     mesh!(Sphere(Point3f0(X[vert_idx,:]), 0.5f0), transparency=false, color=:blue)
+  #   end
+  # end
+
+  link = vert_link_general(inner, unordered_link, X, T)
+
+  # NOTE: code below plots the link with redness corresponding to order in link
+  # n = size(link,1)
+  # println("link: $link")
+  # for (i, vert_idx) in enumerate(link)
+  #   mesh!(Sphere(Point3f0(X[vert_idx,:]), 0.5f0), transparency=false, color=RGBAf0((i-1)/float(n), 0., 0., 1.))
+  # end
+
+  return link
 end
 
 
@@ -182,21 +247,18 @@ function reeb_graph(X, T)
   # TODO we used to have a -1 here. make sure we didn't need it.
   for i = 1:num_crits
     curr_crit = crits[i]
-    curr_crit_tag = curr_crit[1]
+    curr_crit_tag = curr_crit.type
 
-    curr_crit_data = curr_crit[2]
-    curr_crit_vert_idx = curr_crit_data[1]
+    curr_crit_vert_idx = curr_crit.idxs[1]
 
     seed_idxs = []
 
     if curr_crit_tag == crit_min
       # only need one ascending path if at minimum
-      println("A")
       push!(seed_idxs, curr_crit_vert_idx)
     elseif curr_crit_tag == crit_max
       # discount all maxima from this *outer* loop (but we'll still visit them
       # as destinations in the inner loops)
-      println("B")
       continue
     else
       # TODO need to restructure code to compute *multiple* ascending paths for saddles
@@ -226,7 +288,8 @@ function reeb_graph(X, T)
         curr_val = link_vals[curr_idx]
         # println(sign(curr_val))
         if sign(curr_val) < 0 && sign(last_val) > 0
-          println(link_vals[group_best_idx])
+          # println(link_vals[group_best_idx])
+          # println(link)
           push!(seed_idxs, link[group_best_idx])
           group_best_val = -1
           group_best_idx = 0
@@ -242,6 +305,7 @@ function reeb_graph(X, T)
     # critical set
     for seed_idx in seed_idxs
       curr_vert_idx = seed_idx
+      # println(seed_idxs)
       curr_val = dot(X[curr_vert_idx, :], crit_H)
 
       for j = i+1:num_crits

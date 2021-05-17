@@ -18,7 +18,8 @@ include("mesh_io.jl")
 
 
 # model = load("models/cube.off")
-model = load("models/two_cubes.off")
+# model = load("models/two_cubes.off")
+model = load("models/fork.off")
 X = decompose(Point3f0, model)
 T = decompose(TriangleFace{Int}, model)
 
@@ -43,21 +44,26 @@ T = [T[i][j] for i = 1:length(T), j = 1:3]
 
 
 function plot_current_mesh()
-  # display(mesh(
-  #     X, T,
-  #     shading=true,
-  #     transparency=true,
-  #     figure=(resolution=(700, 1000),),
-  #     color = (:red, 0.1)
-  # ))
-  display(meshscatter(
-      X,
+  fig, ax, msh = mesh(
+      X, T,
       shading=true,
       transparency=true,
       figure=(resolution=(700, 1000),),
-      color = (:black, 0.5),
-      markersize = 0.1
-  ))
+      color = (:red, 0.1),
+  )
+  # wireframe!(msh[1], color=(:black, 0.6), linewidth=50)
+  # display(fig)
+
+  display(wireframe(msh[1], color=(:black, 0.6), linewidth=50))
+
+  # display(meshscatter(
+  #     X,
+  #     shading=true,
+  #     transparency=true,
+  #     figure=(resolution=(700, 1000),),
+  #     color = (:black, 0.5),
+  #     markersize = 0.1
+  # ))
 end
 
 function plot_vertex_normals()

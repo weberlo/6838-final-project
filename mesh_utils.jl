@@ -121,3 +121,40 @@ function vert_links(X, T)
   end
   return res
 end
+
+
+function vert_link_general(inner, ring, X, T)
+  # nv = size(X, 1)
+  # rings = one_rings(X, T)
+  # res = Array{Array{Int64}}(undef, nv)
+  # println(inner)
+  # println(ring)
+  tris = Set()
+  for idx in ring
+    for i = 1:size(T, 1)
+      tri = T[i,:]
+      if idx in tri && length(findall(x -> x in inner, tri)) == 1
+        tris = tris ∪ [tri]
+      end
+    end
+  end
+  # tris = map(i -> T[i,:], Iterators.flatten([findall(t -> idx in t, T[1:end,:]) for idx in ring]))
+  # println(typeof(tris[1]))
+  tris = collect(tris)
+  # println(tris)
+  # println(length(ring))
+
+  link_dict = Dict()
+  for tri in tris
+    shift_amt = - (findall(x -> x in inner, tri)[1] - 1)
+    tri = circshift(tri, shift_amt)
+    link_dict[tri[2]] = tri[3]
+  end
+  curr = first(link_dict)[1]
+  res = [curr]
+  for j = 1:(length(ring)-1)
+    curr = link_dict[curr]
+    push!(res, curr)
+  end
+  return res
+end
