@@ -22,7 +22,8 @@ include("mesh_io.jl")
 # model = load("models/fork.off")
 # model = load("models/join.off")
 # model = load("models/torusish.off")
-model = load("models/torus.off")
+# model = load("models/torus.off")
+model = load("models/lattice.off")
 X = decompose(Point3f0, model)
 T = decompose(TriangleFace{Int}, model)
 
@@ -51,13 +52,13 @@ function plot_current_mesh()
       X, T,
       shading=true,
       transparency=true,
-      figure=(resolution=(700, 1000),),
+      figure=(resolution=(1000, 1000),),
       color = (:red, 0.1),
   )
   # wireframe!(msh[1], color=(:black, 0.6), linewidth=50)
   # display(fig)
 
-  display(wireframe(msh[1], color=(:black, 0.6), linewidth=50))
+  display(wireframe(msh[1], color=(:black, 0.6), linewidth=50, figure=(resolution=(700, 700),)))
 
   # display(meshscatter(
   #     X,
@@ -122,11 +123,12 @@ end
 
 
 function plot_crit_sets()
-  crits = crit_points(X, T)
-  crit_idx = 2
+  crits = crit_areas(X, T)
+  crit_idx = 3
   my_crit_set = crit_set(crit_saddles(crits)[crit_idx], X, T)
-  MeshUtils.showdescriptor(X, T, map(x -> (x[1] in my_crit_set) ? 1.0 : 0.0, 1:size(X, 1)))
-  plot_spheres([crit_saddles(crits)[crit_idx][2][1]], :red)
+  # desc = map(x -> (x in my_crit_set) ? 1.0 : 0.0, 1:size(X, 1))
+  # MeshUtils.showdescriptor(convert(Array{Float64}, X), T, desc)
+  plot_spheres(my_crit_set, :purple)
 end
 
 
@@ -139,25 +141,27 @@ function avg_of(idxs, X)
   return res
 end
 
-
-plot_crit_areas()
-# plot_current_mesh()
-
-rg = reeb_graph(X, T)
-crits = crit_areas(X, T)
-println(crits)
-for e in edges(rg)
-  println(e)
-  src_crits_idx = e.src
-  dst_crits_idx = e.dst
-  src_vert_idxs = crits[src_crits_idx].idxs
-  dst_vert_idxs = crits[dst_crits_idx].idxs
-  src_pos = avg_of(src_vert_idxs, X)
-  dst_pos = avg_of(dst_vert_idxs, X)
-  line_seg = Node([src_pos, dst_pos])
-  lines!(line_seg, linewidth=800)
+function plot_reeb_graph()
+  plot_crit_areas()
+  rg = reeb_graph(X, T)
+  crits = crit_areas(X, T)
+  for e in edges(rg)
+    src_crits_idx = e.src
+    dst_crits_idx = e.dst
+    src_vert_idxs = crits[src_crits_idx].idxs
+    dst_vert_idxs = crits[dst_crits_idx].idxs
+    src_pos = avg_of(src_vert_idxs, X)
+    dst_pos = avg_of(dst_vert_idxs, X)
+    line_seg = Node([src_pos, dst_pos])
+    lines!(line_seg, linewidth=800)
+  end
 end
-println(rg)
+
+# plot_current_mesh()
+plot_reeb_graph()
+plot_crit_sets()
+
+
 
 # linesegments!(scene, [Point3f0(0., 0., 0.), Point3f0(0., 0., 1.)], color = :red, fxaa = true)
 # line_seg = Node([Point3f0(10., 0., 0.), Point3f0(10., 0., 10.)])

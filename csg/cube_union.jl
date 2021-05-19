@@ -223,7 +223,7 @@ function show_csg(e :: CSG.Expr)
   ])
   display(lines(bounds, linewidth=0, transparency=true, color=(:black, 0.0),
       shading=true,
-      figure=(resolution=(700, 1000),),
+      figure=(resolution=(1000, 1000),),
   ))
   prims = all_prims(e)
   for prim in prims
@@ -233,10 +233,12 @@ function show_csg(e :: CSG.Expr)
 end
 
 
-test_expr = gen_kissing_torus()
+test_expr = gen_lattice()
 show_csg(test_expr)
 
-@assert false "need to account for crit point multiplicities to correctly handle the kissing torus"
 
-# graph, edge_mult = reeb_graph_of(test_expr)
-# show_graph(graph, edge_mult)
+# TODO handle that
+# @assert false "need to account for crit point multiplicities to correctly handle the kissing torus"
+
+graph, edge_mult = reeb_graph_of(test_expr)
+show_graph(graph, edge_mult)

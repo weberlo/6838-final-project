@@ -7,7 +7,11 @@ function show_csg(e :: CSG.Expr)
   expr_extents = extents(e)
   println(expr_extents)
   x_range = expr_extents.x1:expr_extents.x2
-  display(plot(x_range, LinRange(expr_extents.y1, expr_extents.y2, length(x_range)), opacity=0.))
+  display(plot(
+    x_range,
+    LinRange(expr_extents.y1, expr_extents.y2, length(x_range)),
+    opacity=0.
+  ))
 
   for prim in all_prims(e)
     lens = lengths(prim)

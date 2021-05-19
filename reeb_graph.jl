@@ -166,8 +166,6 @@ function crit_areas(X, T)
 end
 
 function area_link(crit_area_idxs, X, T)
-  println("HERE")
-  println(crit_area_idxs)
   star = Set()
   for idx in crit_area_idxs
     for i = 1:size(T, 1)
@@ -216,7 +214,7 @@ function crit_set(crit_area, X, T)
   end
   # we know we're working with a saddle point now
   curr_link = area_link(crit_area.idxs, X, T)
-  println("curr_link: $curr_link")
+  # println("curr_link: $curr_link")
   to_visit = Queue{Int32}()
   for idx in curr_link
     if dot(X[idx,:], crit_H) < crit_area.val
@@ -225,7 +223,7 @@ function crit_set(crit_area, X, T)
   end
 
   visited = Set(first(to_visit))
-  res = Set()
+  res = Set(crit_area.idxs)
   while !isempty(to_visit)
     curr_vert_idx = dequeue!(to_visit)
     # curr_link = links[curr_vert_idx]
@@ -308,6 +306,7 @@ function reeb_graph(X, T)
       # groups contiguous
       offs = findfirst(map(x -> x < 0, link_vals)) - 1
       link_vals = circshift(link_vals, -offs)
+      println(link_vals)
       last_val = link_vals[1]
       group_best_val = -1
       group_best_idx = 0
@@ -337,11 +336,15 @@ function reeb_graph(X, T)
       curr_val = dot(X[curr_vert_idx, :], crit_H)
       visited = Set()
 
-      for j = i+1:num_crits
+      start_idx = i+1
+      while crits[start_idx].val == crits[i].val
+        start_idx += 1
+      end
+      for j = start_idx:num_crits
         next_crit_set = crit_sets[j]
         next_crit_val = crits[j].val
-        println("next: $next_crit_val")
-        println("next_crit_set: $next_crit_set")
+        # println("next: $next_crit_val")
+        # println("next_crit_set: $next_crit_set")
         while curr_val < next_crit_val && !(curr_vert_idx in next_crit_set)
           was_update = false
           # greedily climb to highest neighbor in link
@@ -361,16 +364,14 @@ function reeb_graph(X, T)
             end
           end
           # println(curr_val)
-          if !was_update
-            # for vert_idx in inner
-              mesh!(Sphere(Point3f0(X[curr_vert_idx,:]), 0.5f0), transparency=false, color=:green)
-            # end
-          end
+          # if !was_update
+          #   mesh!(Sphere(Point3f0(X[curr_vert_idx,:]), 0.5f0), transparency=false, color=:green)
+          # end
           @assert was_update "no higher vertex found in link!"
         end
         if curr_vert_idx in next_crit_set
           if curr_crit_tag == crit_saddle
-            println("FOUND SADDDLELEEE")
+            # println("FOUND SADDDLELEEE")
           end
           add_edge!(res, i, j)
           break
@@ -383,7 +384,7 @@ end
 
 
 function filter_crit_tag(crits, tag)
-  return filter(x -> x[1] == tag, crits)
+  return filter(x -> x.type == tag, crits)
 end
 
 function crit_mins(crits)
@@ -398,20 +399,15 @@ function crit_saddles(crits)
   return filter_crit_tag(crits, crit_saddle)
 end
 
-function crit_data(crits)
-  # discard tag
-  return map(x -> x[2], crits)
-end
-
 function crit_idxs(crits)
-  return map(x -> x[1], crit_data(crits))
+  return map(x -> x.idxs, crit_data(crits))
 end
 
 function crit_vals(crits)
-  return map(x -> x[2], crit_data(crits))
+  return map(x -> x.val, crit_data(crits))
 end
 
 function crit_mults(crits)
   @assert all(map(x -> x[1] == crit_saddle, crits)) "attempt to extract multiplicity from non-saddle point"
-  return map(x -> x[3], crit_data(crits))
+  return map(x -> x.mult, crit_data(crits))
 end

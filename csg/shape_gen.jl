@@ -100,6 +100,7 @@ function gen_flat_line()
   ])
 end
 
+# TODO add support for this one!
 function gen_kissing_torus()
   # where the components only barely touch
   size = 4.
@@ -108,6 +109,22 @@ function gen_kissing_torus()
     gen_square_at(size, Point3(-3., 4., 0.)),
     gen_square_at(size, Point3(3., 4., 0.)),
     gen_square_at(size, Point3(0., 8., 0.)),
+  ])
+end
+
+
+function gen_lattice()
+  # where the components only barely touch
+  size = 4.
+  treeify([
+    gen_square_at(size, Point3(-6., 0., 0.)),
+    gen_square_at(size, Point3(6., 0., 0.)),
+    gen_square_at(size, Point3(0., 0., 0.)),
+    gen_square_at(size, Point3(-3., 3., 0.)),
+    gen_square_at(size, Point3(3., 3., 0.)),
+    gen_square_at(size, Point3(0., 6., 0.)),
+    gen_square_at(size, Point3(-6., 6., 0.)),
+    gen_square_at(size, Point3(6., 6., 0.))
   ])
 end
 
