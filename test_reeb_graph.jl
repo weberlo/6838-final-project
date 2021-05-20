@@ -6,6 +6,7 @@ using Rotations
 include("mesh_utils.jl")
 include("reeb_graph.jl")
 include("mesh_io.jl")
+include("plot_util.jl")
 
 # X, T = MeshUtils.readoff("models/sphere.off")
 # rot_mat = I
@@ -16,14 +17,15 @@ include("mesh_io.jl")
 # X, T = MeshUtils.readoff("models/torusish.off")
 # rot_mat = RotX(-0.3)
 
+# NOTE: don't load this shit or everything crashes
+# model = load("models/torusish.off")
 
 # model = load("models/cube.off")
 # model = load("models/two_cubes.off")
 # model = load("models/fork.off")
-# model = load("models/join.off")
-# model = load("models/torusish.off")
+model = load("models/join.off")
 # model = load("models/torus.off")
-model = load("models/lattice.off")
+# model = load("models/lattice.off")
 X = decompose(Point3f0, model)
 T = decompose(TriangleFace{Int}, model)
 
@@ -47,18 +49,22 @@ T = [T[i][j] for i = 1:length(T), j = 1:3]
 # X = X * rot_mat
 
 
-function plot_current_mesh()
+function plot_current_mesh(do_wireframe=false)
   fig, ax, msh = mesh(
       X, T,
       shading=true,
-      transparency=true,
+      interpolate=true,
+      # transparency=true,
       figure=(resolution=(1000, 1000),),
-      color = (:red, 0.1),
+      color = :blue,
   )
   # wireframe!(msh[1], color=(:black, 0.6), linewidth=50)
-  # display(fig)
+  if do_wireframe
+    display(wireframe(msh[1], color=(:black, 0.6), linewidth=50, figure=(resolution=(700, 700),)))
+  else
+    display(fig)
+  end
 
-  display(wireframe(msh[1], color=(:black, 0.6), linewidth=50, figure=(resolution=(700, 700),)))
 
   # display(meshscatter(
   #     X,
@@ -82,19 +88,7 @@ function plot_vertex_normals()
     arrowcolor = :darkblue)
 end
 
-function plot_spheres(idxs, color)
-  for X_idx in idxs
-    # mesh!(Sphere(Point3f0(X[X_idx,:]), 0.5f0), transparency=false, color=color)
-    plot_sphere_by_pos(Point3f0(X[X_idx,:]), color)
-  end
-end
-
-function plot_sphere_by_pos(pos, color)
-  mesh!(Sphere(pos, 0.5f0), transparency=false, color=color)
-end
-
 function plot_crit_areas()
-  plot_current_mesh()
   # bounds = Node([
   #   Point3f0(0., 0., 0.),
   #   Point3f0(15., 0., 0.),
@@ -128,7 +122,7 @@ function plot_crit_sets()
   my_crit_set = crit_set(crit_saddles(crits)[crit_idx], X, T)
   # desc = map(x -> (x in my_crit_set) ? 1.0 : 0.0, 1:size(X, 1))
   # MeshUtils.showdescriptor(convert(Array{Float64}, X), T, desc)
-  plot_spheres(my_crit_set, :purple)
+  plot_spheres(X, my_crit_set, :purple)
 end
 
 
@@ -157,9 +151,9 @@ function plot_reeb_graph()
   end
 end
 
-# plot_current_mesh()
+plot_current_mesh(true)
 plot_reeb_graph()
-plot_crit_sets()
+# plot_crit_sets()
 
 
 

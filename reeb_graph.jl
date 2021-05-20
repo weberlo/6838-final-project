@@ -4,6 +4,7 @@ using DataStructures
 using LightGraphs
 
 include("mesh_utils.jl")
+include("plot_util.jl")
 
 @enum CritType crit_min crit_max crit_saddle
 
@@ -80,7 +81,7 @@ function classify_by_link(p_val, link, X, T, post_processing)
       end
       last = curr
     end
-    @assert (group_count % 2 == 0) "group count was not multiple of 2!"
+    # @assert (group_count % 2 == 0) "group count was not multiple of 2!"
     if group_count > 2
       multiplicity = (group_count - 2) / 2
       # push!(crit_pts, (type=crit_saddle, idx=i, val=p_val, mult=multiplicity))
@@ -164,6 +165,25 @@ function crit_areas(X, T)
   sort!(res, by = x -> x.val)
   return res
 end
+
+
+function calc_val_to_crit_area(crit_areas)
+  res = DefaultDict(Vector)
+  for crit_area in crit_areas
+    push!(res[crit_area.val], crit_area)
+  end
+  return res
+end
+
+
+function calc_val_to_crit_sets(crit_areas, X, T)
+  res = DefaultDict(Vector)
+  for crit_area in crit_areas
+    push!(res[crit_area.val], crit_set(crit_area, X, T))
+  end
+  return res
+end
+
 
 function area_link(crit_area_idxs, X, T)
   star = Set()
@@ -258,12 +278,17 @@ end
 
 function reeb_graph(X, T)
   links = vert_links(X, T)
+
   crits = crit_areas(X, T)
+  val_to_crits = calc_val_to_crit_area(crits)
   num_crits = size(crits, 1)
+  num_crit_vals = length(keys(val_to_crits))
+
   crit_sets = Array{Set}(undef, num_crits)
   for i = 1:num_crits
     crit_sets[i] = crit_set(crits[i], X, T)
   end
+  val_to_crit_sets = calc_val_to_crit_sets(crits, X, T)
 
   res = SimpleGraph(num_crits)
 
@@ -288,44 +313,61 @@ function reeb_graph(X, T)
 
       # TODO massage this code into current code to compute seed idxs (an idx
       # for the highest vertex in each group)
-      p = X[curr_crit_vert_idx,:]
+      # p = X[curr_crit_vert_idx,:]
 
       # link = links[curr_crit_vert_idx]
       link = area_link(curr_crit.idxs, X, T)
 
-      num_neighbs = size(link, 1)
-      link_vals = zeros(num_neighbs)
-      p_val = dot(p, crit_H)
-      for (j, neighb_X_idx) in enumerate(link)
-        np = X[neighb_X_idx,:]
-        np_val = dot(np, crit_H)
-        link_vals[j] = np_val - p_val
-      end
+      # num_neighbs = size(link, 1)
+      # link_vals = zeros(num_neighbs)
+      # p_val = dot(p, crit_H)
+      # @assert p_val == curr_crit.val
+      # for (j, neighb_X_idx) in enumerate(link)
+      #   np = X[neighb_X_idx,:]
+      #   np_val = dot(np, crit_H)
+      #   link_vals[j] = np_val - p_val
+      # end
 
-      # shift to start with a negative vertex, so we have all of the positive
-      # groups contiguous
-      offs = findfirst(map(x -> x < 0, link_vals)) - 1
-      link_vals = circshift(link_vals, -offs)
-      println(link_vals)
-      last_val = link_vals[1]
-      group_best_val = -1
-      group_best_idx = 0
-      for j = 2:(num_neighbs+1)
-        curr_idx = mod1(j, num_neighbs)
-        curr_val = link_vals[curr_idx]
-        # println(sign(curr_val))
-        if sign(curr_val) < 0 && sign(last_val) > 0
-          # println(link_vals[group_best_idx])
-          # println(link)
-          push!(seed_idxs, link[group_best_idx])
-          group_best_val = -1
-          group_best_idx = 0
-        elseif sign(curr_val) > 0 && curr_val > group_best_val
-          group_best_val = curr_val
-          group_best_idx = curr_idx
-        end
-        last_val = curr_val
+      # if length(curr_crit.idxs) != 1
+      for j = 1:length(curr_crit.idxs)
+        push!(seed_idxs, curr_crit.idxs[j])
       end
+      # for j = 1:length(link)
+      #   push!(seed_idxs, link[j])
+      # end
+
+      # else
+      #   # shift to start with a negative vertex, so we have all of the positive
+      #   # groups contiguous
+      #   offs = findfirst(map(x -> x < 0, link_vals)) - 1
+      #   link_vals = circshift(link_vals, -offs)
+      #   last_val = link_vals[1]
+      #   group_best_val = -Inf
+      #   group_best_idx = 0
+      #   for j = 2:(num_neighbs+1)
+      #     curr_idx = mod1(j, num_neighbs)
+      #     curr_val = link_vals[curr_idx]
+      #     # println(sign(curr_val))
+      #     if sign(curr_val) < 0 && sign(last_val) > 0
+      #       # println(link_vals[group_best_idx])
+      #       # println(link)
+      #       push!(seed_idxs, link[group_best_idx])
+      #       group_best_val = -1
+      #       group_best_idx = 0
+      #     elseif sign(curr_val) > 0 && curr_val > group_best_val
+      #       group_best_val = curr_val
+      #       group_best_idx = curr_idx
+      #     end
+      #     last_val = curr_val
+      #   end
+      # end
+
+      # if i == 6
+      #   plot_spheres(X, curr_crit.idxs, :blue, 1.0f0)
+      #   println(seed_idxs)
+      #   plot_spheres(X, seed_idxs, :purple, 1.0f0)
+      # end
+      @assert length(seed_idxs) != 0
     end
 
     # follow each ascending path (each given by a seed idx) upwards to the next
@@ -333,47 +375,84 @@ function reeb_graph(X, T)
     for seed_idx in seed_idxs
       curr_vert_idx = seed_idx
       # println(seed_idxs)
-      curr_val = dot(X[curr_vert_idx, :], crit_H)
-      visited = Set()
+      seed_val = dot(X[curr_vert_idx, :], crit_H)
+      curr_val = seed_val
 
-      start_idx = i+1
-      while crits[start_idx].val == crits[i].val
-        start_idx += 1
+      println("seed_val: $seed_val")
+      # println("crits: $crits")
+      # println("curr_crit_val: $curr_crit_val")
+
+      function find_next_crit_val(curr_crit_val)
+        for j = 1:num_crits
+          if crits[j].val > curr_crit_val
+            return crits[j].val
+          end
+        end
+        @assert false "no higher crit val"
       end
-      for j = start_idx:num_crits
-        next_crit_set = crit_sets[j]
-        next_crit_val = crits[j].val
-        # println("next: $next_crit_val")
-        # println("next_crit_set: $next_crit_set")
-        while curr_val < next_crit_val && !(curr_vert_idx in next_crit_set)
+
+      function in_any_crit_sets(vert_idx, crit_sets)
+        for crit_set in crit_sets
+          if vert_idx in crit_set
+            return true
+          end
+        end
+        return false
+      end
+
+      # next_crit_sets = []
+      while true
+        next_crit_val = find_next_crit_val(curr_val)
+        next_crit_sets = val_to_crit_sets[next_crit_val]
+        while curr_val < next_crit_val && !in_any_crit_sets(curr_vert_idx, next_crit_sets)
+          if i == 6
+            println("curr_val: $curr_val")
+            println("next_crit_val: $next_crit_val")
+            plot_spheres(X, [curr_vert_idx], :red, 1.0f0)
+          end
+
           was_update = false
-          # greedily climb to highest neighbor in link
+          # greedily climb to highest neighbor in link (or any neighbor in the
+          # set of next critical sets)
           curr_link = links[curr_vert_idx]
           for k = 1:size(curr_link, 1)
             # in here, we're mutably updating the current vertex + value to find
             # the highest vertex.
             neighb_idx = curr_link[k]
             neighb_val = dot(X[neighb_idx, :], crit_H)
-            if neighb_val >= curr_val # && !(neighb_idx in visited)
-              # println("neighb_val: $neighb_val")
-              # println("neighb_idx: $neighb_idx")
-              # visited = visited ∪ neighb_idx
+            in_crit_sets = in_any_crit_sets(neighb_idx, next_crit_sets)
+            if neighb_val >= curr_val || in_crit_sets # && !(neighb_idx in visited)
               curr_val = neighb_val
               curr_vert_idx = neighb_idx
               was_update = true
+              if in_crit_sets
+                println("in crit sets: val = $curr_val")
+                break
+              end
             end
           end
-          # println(curr_val)
-          # if !was_update
-          #   mesh!(Sphere(Point3f0(X[curr_vert_idx,:]), 0.5f0), transparency=false, color=:green)
-          # end
+          println("i = $i")
           @assert was_update "no higher vertex found in link!"
         end
-        if curr_vert_idx in next_crit_set
-          if curr_crit_tag == crit_saddle
-            # println("FOUND SADDDLELEEE")
+
+        if in_any_crit_sets(curr_vert_idx, next_crit_sets)
+          added_edge = false
+          for j = 1:size(next_crit_sets, 1)
+            # TODO currently not breaking the loop so will add an edge for every
+            # crit set we're in
+            if curr_vert_idx in next_crit_sets[j]
+              target_crit_set = next_crit_sets[j]
+              for k = 1:num_crits
+                if crit_sets[k] == target_crit_set
+                  add_edge!(res, i, k)
+                  added_edge = true
+                end
+              end
+              # add_edge!(res, i, val_to_crits[next_crit_val][j].idxs[1])
+            end
           end
-          add_edge!(res, i, j)
+          # println("ADDED EDGE")
+          # @assert false "TODO need to figure out which crit set to add edge for"
           break
         end
       end
